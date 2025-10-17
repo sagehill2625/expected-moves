@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sigma Move Calculator – Futures Expected Move Tool</title>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .result-box { background: rgba(0, 0, 0, 0.1); border-radius: 10px; padding: 15px; margin-top: 15px; }
+  </style>
+</head>
+
+<body class="min-h-screen bg-base-200 flex flex-col items-center justify-center p-4">
+  <div class="max-w-md w-full bg-base-100 shadow-2xl p-6 rounded-2xl">
+    <div class="flex justify-between items-center mb-4">
+      <h1 class="text-2xl font-bold text-primary">Sigma Move Calculator</h1>
+      <label class="swap swap-rotate">
+        <input type="checkbox" id="themeToggle" />
+        <svg class="swap-on fill-current w-8 h-8 text-yellow-300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5.64 17.657l-1.414-1.414L7.05 13.42l1.414 1.414zM12 4.354V2h-2v2.354zM4.354 10H2v2h2.354zM17.657 5.64l1.414-1.414L20.95 7.05l-1.414 1.414zM12 21.646V24h2v-2.354zM21.646 12H24v-2h-2.354zM17.657 18.36l1.414 1.414-1.889 1.889-1.414-1.414zM8.344 5.64L6.93 4.226l1.889-1.889 1.414 1.414z"/></svg>
+        <svg class="swap-off fill-current w-8 h-8 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21.64 13.36A9 9 0 0110.64 2.36a9 9 0 1011 11z"/></svg>
+      </label>
+    </div>
+
+    <!-- Inputs -->
+    <label class="label"><span class="label-text font-semibold">Select Instrument</span></label>
+    <select id="symbol" class="select select-bordered w-full mb-3" onchange="updateVolIndex()">
+      <option value="MNQ">MNQ / NQ (NASDAQ Futures)</option>
+      <option value="MES">MES / ES (S&P 500 Futures)</option>
+      <option value="MYM">MYM / YM (Dow Futures)</option>
+    </select>
+
+    <label class="label"><span class="label-text font-semibold">Volatility Index</span></label>
+    <input id="volIndex" type="text" class="input input-bordered w-full mb-3" readonly value="VXN">
+
+    <label class="label"><span class="label-text font-semibold">Previous Day Close (Settlement)</span></label>
+    <input id="price" type="number" placeholder="e.g. 24904.50" class="input input-bordered w-full mb-3">
+
+    <label class="label"><span class="label-text font-semibold">Volatility Value (VXN/VIX/VXD %)</span></label>
+    <input id="iv" type="number" placeholder="e.g. 26.99" class="input input-bordered w-full mb-3">
+
+    <label class="label"><span class="label-text font-semibold">Days (1 = Daily, 5 = Weekly)</span></label>
+    <input id="days" type="number" placeholder="e.g. 1 or 5" class="input input-bordered w-full mb-3">
+
+    <div class="form-control mb-3">
+      <label class="label cursor-pointer">
+        <span class="label-text">Use Calendar Days (365)</span>
+        <input type="checkbox" id="use365" class="toggle toggle-primary" />
+      </label>
+    </div>
+
+    <div class="flex gap-2 mt-3">
+      <button class="btn btn-primary w-1/2" onclick="calculate()">Calculate</button>
+      <button class="btn btn-outline w-1/2" onclick="clearAll()">Clear</button>
+    </div>
+
+    <div id="result" class="result-box hidden"></div>
+
+    <!-- Learn More Section -->
+<div class="collapse collapse-arrow mt-4">
+  <input type="checkbox" />
+  <div class="collapse-title text-lg font-semibold">📘 Learn More</div>
+  <div class="collapse-content text-sm leading-relaxed space-y-3">
+
+    <p><strong>🧠 What Is the Expected Move?</strong></p>
+    <p>The <b>Expected Move (EM)</b> is the statistically projected range a market is likely to trade within over a given period — based on its <b>Implied Volatility (IV)</b>.  
+    It shows the price range with roughly <b>68% probability (1σ)</b> of containing the next day’s or week’s move.</p>
+
+    <p><strong>📈 Formula:</strong><br>
+    <code>Expected Move = Price × (IV ÷ 100) × √(Days ÷ 252)</code><br>
+    If you toggle “Use Calendar Days,” the denominator becomes 365.  
+    This difference explains small variations between different expected move tools.</p>
+
+    <hr>
+
+    <p><strong>🔍 IV vs VXN (Why Numbers Can Differ)</strong></p>
+
+    <p><b>VXN</b> is the NASDAQ-100’s own volatility index — often called the “VIX for NASDAQ.”  
+    It represents the <b>average implied volatility</b> of at-the-money NDX options with about 30 days to expiration.</p>
+
+    <p>On the other hand, when you check an <b>individual option chain</b> (for example, on ThinkOrSwim or OptionStrat),  
+    the <b>IV you see</b> is for that specific option — it depends on its strike, time to expiry, and option skew.  
+    So, the IV in the options chain is <b>localized</b>, while the VXN is a <b>composite, averaged measure</b> of the overall market’s volatility expectation.</p>
+
+    <p>Because of that, expected moves derived from VXN (like this calculator) and expected moves derived from your broker’s implied volatility can <b>differ slightly</b> — usually by a few points or percentages.  
+    Both are statistically valid, but they measure volatility at <b>different levels of granularity</b>:</p>
+
+    <ul class="list-disc list-inside">
+      <li><b>VXN / VIX / VXD:</b> Broad market volatility index (index-level volatility)</li>
+      <li><b>Option Chain IV:</b> Volatility of a specific contract or expiration</li>
+    </ul>
+
+    <p>So, if you use the same day’s closing <b>VXN value</b> and your friend uses the <b>NDX 30-day ATM IV</b>, your expected move may differ slightly — both are correct within their context.</p>
+
+    <hr>
+
+    <p><strong>⚖️ 252 vs 365 — Why the Toggle Matters</strong></p>
+    <p>Some professional models (like in ThinkOrSwim or OptionStrat) use <b>365 calendar days</b> for √time scaling, while traders focused on daily sigma levels use <b>252 trading days</b>.  
+    Using 365 results in slightly smaller expected moves — because volatility is “spread” over more total days.</p>
+
+    <ul class="list-disc list-inside">
+      <li><b>252:</b> Matches trading days per year (used for futures & ICT-style sigma)</li>
+      <li><b>365:</b> Matches calendar-day scaling (used for general option pricing)</li>
+    </ul>
+
+    <hr>
+
+    <p><strong>💡 Reading Your Results:</strong></p>
+    <ul class="list-disc list-inside">
+      <li><b>Daily Exp. High/Low (0.5σ):</b> Smaller zone, ~34% probability range — “Expected” intraday movement.</li>
+      <li><b>Daily Sigma (1σ):</b> Standard 68% range — statistically likely move for the next day or period.</li>
+      <li><b>2σ / 3σ:</b> Broader 95% / 99.7% probability boundaries.</li>
+    </ul>
+
+    <hr>
+
+    <p><strong>🧭 How to Collect Accurate Inputs:</strong></p>
+    <ol class="list-decimal list-inside">
+      <li>Open <b>TradingView</b>.</li>
+      <li>For price:
+        <ul class="list-disc list-inside ml-4">
+          <li><b>NQ / MNQ:</b> use <code>NQ1!</code></li>
+          <li><b>ES / MES:</b> use <code>ES1!</code></li>
+          <li><b>YM / MYM:</b> use <code>YM1!</code></li>
+        </ul>
+        Note the <b>previous day’s closing or settlement price</b>.
+      </li>
+      <li>For volatility:
+        <ul class="list-disc list-inside ml-4">
+          <li><b>NQ:</b> use <code>VXN</code></li>
+          <li><b>ES:</b> use <code>VIX</code></li>
+          <li><b>YM:</b> use <code>VXD</code></li>
+        </ul>
+        Use the <b>previous day’s close</b> of the volatility index.
+      </li>
+      <li>Set Days = 1 for daily sigma, or 5 for weekly sigma levels.</li>
+    </ol>
+
+    <hr>
+
+    <p><strong>📚 Example:</strong><br>
+    If NQ closed at 24,900 and VXN closed at 27%, then:
+    <br><code>24,900 × 0.27 × √(1 ÷ 252) ≈ 424 pts</code>
+    <br>→ Expected Move = ±424 → Range: <b>24,476 – 25,324</b>
+    <br>Half move (0.5σ) → ±212 → <b>24,688 – 25,112</b></p>
+
+    <p class="mt-2 italic text-sm text-gray-400">
+      Note: Actual broker “expected move” tools may show slightly different results if they use live IV from the option chain or 365-day scaling. This tool focuses on futures sigma levels derived from volatility indices (VXN, VIX, VXD).
+    </p>
+
+  </div>
+</div>
+
+  </div>
+
+  <div class="mt-6 text-center text-sm opacity-60">
+    📊 Future update: live sigma chart visualization coming soon.
+  </div>
+
+  <script>
+    // === Theme Toggle ===
+    const themeToggle = document.getElementById('themeToggle');
+    themeToggle.addEventListener('change', () => {
+      document.documentElement.setAttribute('data-theme',
+        themeToggle.checked ? 'light' : 'dark');
+    });
+
+    // === Update Vol Index Based on Symbol ===
+    function updateVolIndex() {
+      const symbol = document.getElementById("symbol").value;
+      const volIndexInput = document.getElementById("volIndex");
+      if (symbol === "MNQ") volIndexInput.value = "VXN";
+      if (symbol === "MES") volIndexInput.value = "VIX";
+      if (symbol === "MYM") volIndexInput.value = "VXD";
+    }
+
+    // === Core Calculation ===
+    function calculate() {
+      const price = parseFloat(document.getElementById('price').value);
+      const ivPercent = parseFloat(document.getElementById('iv').value);
+      const days = parseFloat(document.getElementById('days').value);
+      const symbol = document.getElementById('symbol').value;
+      const volIndex = document.getElementById('volIndex').value;
+      const use365 = document.getElementById('use365').checked;
+
+      if (!price || !ivPercent || !days) {
+        showResult("⚠️ Please fill all fields.");
+        return;
+      }
+
+      const denominator = use365 ? 365 : 252;
+      const iv = ivPercent / 100;
+      const expectedMove = price * iv * Math.sqrt(days / denominator);
+      const halfSigma = expectedMove / 2;
+
+      const upperExp = price + halfSigma, lowerExp = price - halfSigma;
+      const upperSigma = price + expectedMove, lowerSigma = price - expectedMove;
+      const upper2 = price + 2 * expectedMove, lower2 = price - 2 * expectedMove;
+
+      showResult(`
+        <h3 class="font-bold text-lg text-primary mb-2">${symbol} (${volIndex})</h3>
+        <p>🎯 <b>Expected Move (1σ):</b> ±${expectedMove.toFixed(2)} pts</p>
+        <p>📍 <b>Daily Exp. (0.5σ):</b> ${lowerExp.toFixed(2)} – ${upperExp.toFixed(2)}</p>
+        <p>🧭 <b>Daily Sigma (1σ):</b> ${lowerSigma.toFixed(2)} – ${upperSigma.toFixed(2)}</p>
+        <p>2σ Range: ${lower2.toFixed(2)} – ${upper2.toFixed(2)}</p>
+        <hr class="my-2"/>
+        <small>IV: ${ivPercent}% | Days: ${days} | Using ${denominator}-day year basis</small>
+      `);
+    }
+
+    function showResult(html) {
+      const result = document.getElementById('result');
+      result.classList.remove("hidden");
+      result.innerHTML = html;
+    }
+
+    function clearAll() {
+      ['price', 'iv', 'days'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('result').classList.add("hidden");
+    }
+  </script>
+</body>
+</html>
